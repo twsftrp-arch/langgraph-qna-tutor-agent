@@ -1,0 +1,14 @@
+{
+  "student-minji": {
+    "name": "민지",
+    "level": "수학 II 개념 학습 중",
+    "weak_points": ["극한 기호 해석", "접선 기울기와 평균변화율 연결"],
+    "preferred_style": "그래프 의미를 먼저 설명한 뒤 식으로 정리"
+  },
+  "guest": {
+    "name": "비수강생",
+    "level": "unknown",
+    "weak_points": ["문항 조건 해석"],
+    "preferred_style": "공개 기출 풀이 중심의 짧은 단계별 설명"
+  }
+}
