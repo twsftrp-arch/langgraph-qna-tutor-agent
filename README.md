@@ -1,53 +1,104 @@
 # Trinity RAG Assistant
 
-Nomad Coders Education Agent / LangGraph 미션 제출용 리포지토리입니다.
+LangGraph로 만든 수학 Education Agent입니다. 질문 의도를 분류하는 Supervisor와 Tutor, Quiz, Researcher 전문 에이전트가 협업하고, repo-local RAG 자료를 이용해 학생별 설명·퀴즈·자료 조사를 제공합니다. 기본 채팅 인터페이스는 Streamlit으로 실행합니다.
 
-## 1. 목적
-수학 질문을 받아 학생의 권한(수강생 vs 비수강생)에 따라 Two-track RAG(Premium/Public)를 수행하고, 선생님(Human-in-the-loop)의 검토와 피드백을 거쳐 최종 답변을 생성하는 Education Agent입니다.
+## 구현 범위
 
-RAG는 고정 문자열 mock이 아니라 repo-local `data/` 폴더의 Markdown/JSON 자료를 Tool로 읽고 검색하는 file-RAG 방식입니다.
+이번 Advanced Features 과제의 Option A, B, C를 모두 한 그래프에 적용했습니다.
 
-## 2. 그래프 구조
-- **Check Auth Node**: 질문자의 수강 여부를 확인합니다.
-- **Load Memory Node**: `MemorySaver`와 학생 프로필 Tool을 이용해 이전 질문/학생 정보를 불러옵니다.
-- **Premium Plan Node**: 강의 타임스탬프, 교재 메타데이터, 교육과정 자료 검색 작업을 계획합니다.
-- **Public Plan Node**: 공개 기출 해설, 공개 개념 노트, 교육과정 자료 검색 작업을 계획합니다.
-- **Retrieve Context Node**: `Send` API로 전달된 검색 작업을 병렬로 실행합니다.
-- **Draft Answer Node**: 검색 결과와 메모리를 이용해 답변 초안을 작성합니다.
-- **Teacher Review Node**: 선생님의 승인 또는 피드백 대기
-- **Revise Draft Node**: 선생님의 피드백을 반영하여 초안 수정
-- **Publish Node**: 최종 승인된 답변 발행
+### Option A: 멀티 에이전트
 
-## 3. 미션 요구사항 매핑
-- **3개 이상 노드**: `check_auth_node`, `load_memory_node`, `premium_plan_node`, `public_plan_node`, `retrieve_context_node`, `draft_answer_node`, `teacher_review_node`, `revise_draft_node`, `publish_node`
-- **Conditional Edge**:
-  - `load_memory_node` 이후 `is_enrolled` 값에 따라 `premium_plan_node` 또는 `public_plan_node`로 분기
-  - `teacher_review_node` 이후 승인 여부에 따라 `publish_node` 또는 `revise_draft_node`로 분기
-- **Tool 연동**:
-  - `search_file_corpus`: `data/*.md`에서 질문 관련 문단 검색
-  - `lookup_curriculum_standard`: 교육과정 성취기준 검색
-  - `load_student_profile`: `data/student_profiles.json`에서 학생 프로필 로드
-  - `format_solution_steps`: 검색 컨텍스트와 메모리를 답변 구조로 정리
-- **Human-in-the-loop 흐름**: 선생님 피드백이 있으면 답변을 수정한 뒤 다시 리뷰 노드로 돌아갑니다.
+- `Supervisor Agent`: 자동 모드에서 질문 의도를 판별하거나 사용자가 고른 모드를 따릅니다.
+- `Tutor Agent`: 학생 프로필과 검색 근거를 반영한 Feynman식 설명을 만듭니다.
+- `Quiz Agent`: 객관식 문제를 만들고 같은 `thread_id`의 다음 답변을 채점합니다.
+- `Researcher Agent`: 여러 자료에서 찾은 내용과 출처를 정리합니다.
+- `Judge Agent`: 답변의 구조, 근거, 학습 활동, 접근 범위를 평가합니다.
 
-## 4. 선택사항 구현
-- **병렬 실행 (Send API)**: Premium/Public plan node가 검색 작업 3개를 만들고 `Send("retrieve_context_node", ...)`로 병렬 fan-out합니다.
-- **메모리 기능**: `MemorySaver` 체크포인터를 사용합니다. 같은 `thread_id`로 후속 질문을 보내면 `question_history`가 누적됩니다.
-- **여러 개 Tool 연동**: 파일 검색, 교육과정 검색, 학생 프로필 로딩, 답변 구조화 Tool을 함께 사용합니다.
+### Option B: 워크플로우 아키텍처
 
-## 5. 실행 방법
-```bash
-pip install -r requirements.txt
-jupyter notebook qna_tutor_agent.ipynb
+- Prompt Chaining: `Research Synthesis -> Specialist -> Judge -> Publish` 순서로 각 단계의 결과를 다음 단계가 사용합니다.
+- Parallelization: LangGraph `Send` API로 여러 RAG 검색 worker를 fan-out합니다.
+- Orchestrator-Workers: Supervisor가 질문, 전문 에이전트, 수강 권한에 따라 매 요청마다 1~3개의 검색 작업을 동적으로 만듭니다.
+- Conditional Routing: Supervisor가 Tutor, Quiz, Researcher 중 하나로 라우팅하고, 교사 검토 사용 여부와 승인 결과에 따라 후속 경로를 선택합니다.
+
+### Option C: 테스트
+
+- PyTest 노드 테스트: Supervisor 라우팅, 동적 worker 계획, Public/Premium 접근 경계를 독립적으로 검증합니다.
+- 통합 테스트: Tutor, Quiz 생성·채점, Researcher의 교사 검토 중단·수정·승인을 끝까지 실행합니다.
+- AI-as-judge: 외부 모델 설정이 있으면 구조화된 평가를 실행하고, 설정이 없거나 호출에 실패하면 로컬 rubric으로 안전하게 전환합니다.
+- Streamlit 테스트: 앱 로딩과 실제 채팅 한 턴을 `streamlit.testing`으로 검증합니다.
+
+## 그래프 구조
+
+```mermaid
+flowchart TD
+    Start([START]) --> Auth[Check Auth]
+    Auth --> Memory[Load Memory]
+    Memory --> Supervisor[Supervisor Agent]
+    Supervisor -->|Send 1..3| Worker[Research Workers]
+    Worker --> Synthesis[Research Synthesis]
+    Synthesis -->|설명| Tutor[Tutor Agent]
+    Synthesis -->|문제·채점| Quiz[Quiz Agent]
+    Synthesis -->|자료 조사| Researcher[Researcher Agent]
+    Tutor --> Judge[Judge Agent]
+    Quiz --> Judge
+    Researcher --> Judge
+    Judge -->|자동 발행| AutoPublish[Auto Publish]
+    Judge -->|교사 검토 사용| Review[Teacher Review interrupt]
+    Review -->|승인| Publish[Publish]
+    Review -->|수정 요청| Revise[Revise Draft]
+    Revise --> Review
+    AutoPublish --> Publish
+    Publish --> End([END])
 ```
-노트북 셀을 순서대로 실행하여 테스트 코드가 작동하는 것을 확인할 수 있습니다.
 
-터미널에서 빠르게 검증하려면:
+## RAG와 메모리
+
+- `data/`의 Markdown/JSON을 Tool로 읽는 file-RAG입니다.
+- 수강생은 Premium 자료, 비수강생은 Public 자료만 검색합니다.
+- 검색 파일명은 allowlist로 제한해 임의 경로 접근을 막습니다.
+- `MemorySaver`가 같은 `thread_id`의 질문 기록과 진행 중인 퀴즈를 유지합니다.
+- 교사 검토를 켜면 LangGraph `interrupt()`에서 멈추고 `Command(resume=...)`로 승인 또는 수정합니다.
+
+## 실행 방법
+
+Python 의존성은 `requirements.txt`에 정리되어 있습니다.
+
 ```bash
-python agent.py
+uv run --with-requirements requirements.txt streamlit run streamlit_app.py
 ```
 
-## 6. 포함된 RAG 자료
+브라우저에서 표시되는 주소로 접속한 뒤 자동, 튜터, 퀴즈, 자료 조사 모드를 선택할 수 있습니다. 기본값은 별도 API 키 없이 끝까지 동작하는 로컬 judge입니다.
+
+CLI 데모에서는 Tutor, Quiz 생성·채점, Researcher와 교사 검토 흐름을 차례로 실행합니다.
+
+```bash
+uv run --with-requirements requirements.txt python agent.py
+```
+
+노트북으로 확인하려면 `qna_tutor_agent.ipynb`를 열어 셀을 순서대로 실행합니다.
+
+## AI judge 설정
+
+실제 외부 AI judge를 사용하려면 실행 환경에 다음 이름의 변수를 설정합니다. 값은 저장소에 기록하지 않습니다.
+
+- `OPENAI_API_KEY`
+- `EDUCATION_AGENT_JUDGE_MODEL`
+
+두 변수가 모두 설정된 경우에만 Streamlit의 외부 AI judge 토글이 활성화됩니다. 외부 호출이 실패하면 예외 종류만 기록하고 로컬 평가로 전환합니다.
+
+## 테스트와 검증
+
+```bash
+uv run --with-requirements requirements.txt pytest -q
+python3 -m py_compile agent.py streamlit_app.py
+jq empty qna_tutor_agent.ipynb
+bash -n init_and_push.sh
+git diff --check
+```
+
+## 포함된 자료
+
 - `data/premium_lecture_transcripts.md`
 - `data/premium_textbook_metadata.md`
 - `data/public_exam_solutions.md`

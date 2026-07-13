@@ -1,2 +1,6 @@
 langgraph
 langchain-core
+langchain-openai
+pydantic
+streamlit
+pytest
