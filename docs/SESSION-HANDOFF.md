@@ -126,3 +126,24 @@
   - `bash -n init_and_push.sh` passed.
   - `git diff --check` passed.
   - staged secret-pattern scan returned no matches.
+
+---
+
+## 2026-07-13 MacBook to iMac Continuation
+
+- Purpose: make the MacBook session context usable from the iMac for the next assignment.
+- Current repo: `/Users/sungminkim/Desktop/langgraph-qna-tutor-agent`
+- Remote: `https://github.com/twsftrp-arch/langgraph-qna-tutor-agent`
+- Branch: `main`
+- Current local/remote status before this note: clean and synced at `ef432e7`.
+- Current HEAD before this note: `ef432e7 docs: record education agent push`.
+- Implementation commit to submit/reference:
+  - `5541b7927acc6ce82a75d334d065ce04dd81f560`
+  - `https://github.com/twsftrp-arch/langgraph-qna-tutor-agent/commit/5541b7927acc6ce82a75d334d065ce04dd81f560`
+- Added iMac paste-ready prompt:
+  - `docs/IMAC-CONTINUATION-PROMPT.md`
+- Next safe step on iMac:
+  - Pull or clone this repo.
+  - Read `docs/SESSION-HANDOFF.md`, `README.md`, `agent.py`, `qna_tutor_agent.ipynb`, and `data/`.
+  - Continue the new assignment from this dedicated repo, not from `life-coach-agent`, unless 성민님 explicitly redirects.
+- Gated actions not performed in this note: no deployment, no production config, no secret inspection.
